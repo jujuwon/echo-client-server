@@ -18,6 +18,7 @@ int main(int argc, char** argv)
         usage();
         exit(1);
     }
+
     int sock, acceptSock;
     int portNo = atoi(argv[1]);
     struct sockaddr_in servAddr, clntAddr;
@@ -25,7 +26,7 @@ int main(int argc, char** argv)
 
     // Create a socket
     sock = socket(AF_INET, SOCK_STREAM, 0);
-    if(sock == 0) {
+    if(sock < 0) {
         error("ERROR : Opening socket");
     }
 
