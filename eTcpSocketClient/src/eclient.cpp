@@ -28,19 +28,46 @@ bool Eclient::eMakeSocket(char *addr, int portNo)
     return true;
 }
 
-bool Eclient::eSend()
+void Eclient::eSendRecv()
 {
-    int n;
-    memset(buffer, 0, sizeof(buffer));
-    std::cin.getline(buffer, MSG_LENGTH);
-    n = write(sock, buffer, strlen(buffer));
-    if(n < 0) {
-        eError("Write");
-        return false;
+    pthread_create(&sendThread, NULL, eSend, (void*)&sock);
+    pthread_create(&recvThread, NULL, eRecv, (void*)&sock);
+    pthread_detach(sendThread);
+    pthread_join(recvThread, NULL);
+    close(sock);
+}
+
+void *Eclient::eSend(void *arg)
+{
+    int sock = *((int*)arg);
+    char sendMsg[MSG_LENGTH];
+
+    while(true) {
+        memset(sendMsg, 0, sizeof(sendMsg));
+        std::cin.getline(sendMsg, MSG_LENGTH);
+        write(sock, sendMsg, strlen(sendMsg));
     }
 
-    return true;
+    return NULL;
 }
+
+void *Eclient::eRecv(void *arg)
+{
+    int sock = *((int*)arg);
+    char recvMsg[MSG_LENGTH];
+    int length;
+
+    while(true) {
+        length = read(sock, recvMsg, sizeof(recvMsg));
+        if(length == -1) {
+            std::cout << "ERROR : Recv" << std::endl;
+            exit(1);
+        }
+        std::cout << "Message : " << recvMsg << std::endl;
+    }
+    return NULL;
+}
+
 
 void Eclient::eClose()
 {

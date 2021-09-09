@@ -5,11 +5,14 @@ struct Eclient : Esocket
 {
     Eclient(){};
     ~Eclient(){};
-    char buffer[MSG_LENGTH];
+    pthread_mutex_t mutx;
+    pthread_t sendThread, recvThread;
 
 public:
     static void eUsage();
     bool eMakeSocket(char* addr, int portNo);
-    bool eSend();
+    void eSendRecv();
+    static void *eSend(void *arg);
+    static void *eRecv(void *arg);
     void eClose();
 };
