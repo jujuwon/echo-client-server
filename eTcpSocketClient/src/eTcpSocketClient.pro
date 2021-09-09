@@ -13,3 +13,7 @@ HEADERS += \
     eclient.h \
     esocket.h \
     stdafx.h
+
+QMAKE_CXXFLAGS += -std=c++0x -pthread
+
+LIBS += -pthread
