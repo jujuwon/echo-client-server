@@ -1,19 +1,23 @@
 #include "eserver.h"
 
+int Eserver::clntCnt = 0;
+int Eserver::clntSocks[];
+bool Eserver::echo = false;
+bool Eserver::broad = false;
+
 void Eserver::eUsage()
 {
     std::cout << "syntax : echo-server <port> [-e[-b]]" << std::endl;
     std::cout << "sample : echo-server 1234 -e -b" << std::endl;
 }
 
-bool Eserver::eMakeSocket(int portNo)
+void Eserver::eMakeSocket(int portNo)
 {
     this->portNo = portNo;
     // Create a socket
     sock = socket(AF_INET, SOCK_STREAM, 0);
     if(sock < 0) {
         eError("ERROR : Opening socket");
-        return false;
     }
 
     // Clear address struct
@@ -26,44 +30,72 @@ bool Eserver::eMakeSocket(int portNo)
     // Binding socket
     if(bind(sock, (struct sockaddr*) &servAddr, sizeof(servAddr)) < 0) {
         eError("ERROR : Binding");
-        return false;
     }
 
     // Listen
     if(listen(sock, 5) < 0) {
         eError("listen");
-        return false;
     }
-    return true;
+
+    pthread_mutex_init(&mutx, NULL);
 }
 
-void Eserver::eAccept()
+void Eserver::eConnect()
 {
-    clntLen = sizeof(clntAddr);
-    // Accept
-    clntSock = accept(sock, (struct sockaddr *) &clntAddr, &clntLen);
-    if(clntSock < 0) {
-        eError("ERROR : Accept");
-    }
-    // std::cout << "Connection Success" << inet_ntoa(clntAddr.sin_addr) << std::endl;
+    while(true) {
+        clntLen = sizeof(clntAddr);
+        // Accept
+        clntSock = accept(sock, (struct sockaddr *) &clntAddr, &clntLen);
+        if(clntSocks[clntCnt] < 0) {
+            eError("ERROR : Accept");
+        }
 
-    // Send msg
-    // send(servSock, "Hello, world!\n", 13, 0);
+        pthread_mutex_lock(&mutx);
+        clntSocks[clntCnt] = clntSock;
+        pthread_mutex_unlock(&mutx);
+
+        pthread_create(&id[clntCnt], NULL, eSendRecv, (void*)&clntSock);
+        pthread_detach(id[clntCnt++]);
+
+        std::cout << "Connection Success : " << inet_ntoa(clntAddr.sin_addr) << std::endl;
+    }
+    eClose(clntSock);
 }
 
-void Eserver::eRecv()
+void *Eserver::eSendRecv(void *arg)
 {
-    memset(buffer, 0, sizeof(buffer));
-    int n = read(clntSock, buffer, sizeof(buffer)-1);
-    if(n < 0) {
-        eError("ERROR : Read");
-    }else {
-        std::cout << "Message : " << buffer << std::endl;
+    int clntSock = *((int*)arg);
+    int length = 0;
+    char msg[1024];
+
+    while((length = read(clntSock, msg, sizeof(msg)-1)) != 0) {
+        if(echo) {
+            if(broad) {
+                for(int i=0; i<clntCnt; i++) {
+                    write(clntSocks[i], msg, sizeof(msg));
+                }
+            }else {
+                write(clntSock, msg, sizeof(msg));
+            }
+        }
+
+        std::cout << "Message : " << msg << std::endl;
+        memset(msg, 0, sizeof(msg));
     }
+
+    return NULL;
 }
 
-void Eserver::eClose()
+void Eserver::eClose(int clntSock)
 {
     close(sock);
     close(clntSock);
+}
+
+void Eserver::optCheck(int argc, char ** argv)
+{
+    for(int i=0; i<argc; i++) {
+        if(!strcmp((argv[i]), "-e")) echo = true;
+        if(!strcmp((argv[i]), "-b")) broad = true;
+    }
 }
